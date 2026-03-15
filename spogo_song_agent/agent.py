@@ -1648,7 +1648,7 @@ root_agent = Agent(
         "For queue-list requests, first tell users how many songs were found, then confirm how many songs were added to queue. "
         "When the user asks to play music, call play_song with the requested song and optional album hint. "
         "Start quiz mode only when the user explicitly asks to start a song quiz/game/challenge. "
-        "For explicit quiz-start requests, call start_song_quiz with the user category request. "
+        "For explicit quiz-start requests, first acknowledge and reiterate the chosen quiz category once and say you are selecting and queueing songs for that category, then call start_song_quiz with the user category request. "
         "While quiz mode is active, route song-guess attempts to submit_song_quiz_guess and do not use check_current_song_guess for those guesses. "
         "If the user asks to stop, end, quit, or cancel an active quiz, call cancel_song_quiz. "
         "Outside quiz mode, when the user guesses the current song name, call check_current_song_guess with their guess and tell them if they are right or wrong. "

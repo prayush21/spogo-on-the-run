@@ -143,6 +143,7 @@ Tools:
 Rules:
 
 - Starts only on explicit quiz intent.
+- After capturing the quiz category, acknowledge and reiterate that category once before quiz setup starts.
 - Exactly 5 rounds.
 - Maximum 2 attempts per round.
 - Score +1 only for correct rounds.
@@ -159,6 +160,7 @@ Prompt:
 
 Expected response pattern:
 
+- "Starting a song quiz for '90s Bollywood romance'. I will select and queue 5 songs for this category now."
 - "Quiz started for '90s Bollywood romance'. Round 1 of 5 is now playing. You have 2 attempts to guess this song."
 
 ### Round-by-Round Guessing
