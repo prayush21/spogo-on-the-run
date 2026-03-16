@@ -50,3 +50,6 @@ htmlcov/
 # Misc
 *.log
 .cache/
+
+#Cloudrun Snapshots
+cloudrun_snapshots/

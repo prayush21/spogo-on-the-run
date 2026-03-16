@@ -11,8 +11,9 @@ This workspace includes an ADK Spotify assistant that supports four main user jo
 
 - `spogo_song_agent/agent.py` - ADK agent, tools, queue/play helpers, and quiz state engine.
 - `spogo_song_agent/__init__.py` - package entry for ADK discovery.
+- `spogo_song_agent/requirements.txt` - agent-local dependencies used by ADK Cloud Run packaging.
 - `spogo_song_agent/.env.example` - environment variable template.
-- `requirements.txt` - Python dependency list.
+- `requirements.txt` - root convenience wrapper for local setup.
 
 ## Prerequisites
 
@@ -56,6 +57,171 @@ In ADK Web:
 
 1. Select `spogo_song_agent` in the agent dropdown.
 2. Try one prompt from each interaction flow below.
+
+## Cloud Run Step 1 Validation
+
+ADK Cloud Run deployment expects the agent directory passed as `AGENT_PATH` to contain:
+
+- `agent.py`
+- `root_agent` defined in `agent.py`
+- `__init__.py` with `from . import agent`
+- `requirements.txt`
+
+Run the local validation script:
+
+```bash
+bash scripts/validate_cloud_run_shape.sh spogo_song_agent
+```
+
+## Cloud Run Step 2 Runtime Env Lock (Vertex Live Voice)
+
+For production voice mode on Cloud Run, set these environment variables in line with the ADK Gemini Live API guide:
+
+- `GOOGLE_GENAI_USE_VERTEXAI=TRUE`
+- `GOOGLE_CLOUD_PROJECT=<your_project_id>`
+- `GOOGLE_CLOUD_LOCATION=<your_region>`
+- `AGENT_MODEL=gemini-live-2.5-flash-native-audio`
+
+Set deployment shell variables:
+
+```bash
+export GOOGLE_CLOUD_PROJECT="your-project-id"
+export GOOGLE_CLOUD_LOCATION="us-central1"
+export AGENT_MODEL="gemini-live-2.5-flash-native-audio"
+```
+
+When validation passes, this deploy shape is ready for `adk deploy cloud_run`:
+
+```bash
+./.venv/bin/adk deploy cloud_run \
+   --project="$GOOGLE_CLOUD_PROJECT" \
+   --region="$GOOGLE_CLOUD_LOCATION" \
+   --with_ui \
+   spogo_song_agent
+```
+
+After deploy, lock the runtime env on the Cloud Run service (service name is shown in deploy output):
+
+```bash
+bash scripts/configure_cloud_run_voice_env.sh \
+   <cloud_run_service_name> \
+   "$GOOGLE_CLOUD_PROJECT" \
+   "$GOOGLE_CLOUD_LOCATION" \
+   "$AGENT_MODEL"
+```
+
+This ensures the running container uses Vertex Live API and an audio-capable Vertex model for mobile voice sessions.
+
+## Cloud Run Step 3 Secret Manager + IAM (Model/Auth Material)
+
+For production runtime security, store sensitive values in Secret Manager and bind access to the Cloud Run runtime service account.
+
+This step prepares:
+
+- `GOOGLE_API_KEY` / `GEMINI_API_KEY` secret binding for list-generation fallback in `generate_song_list`.
+- `SPOGO_AUTH_BLOB` secret binding for spogo auth material (consumed in Step 4 startup/auth wiring).
+- IAM role `roles/aiplatform.user` on the Cloud Run runtime service account for Vertex model access.
+- IAM role `roles/secretmanager.secretAccessor` on the two secrets for the runtime service account.
+
+Create local source files outside git:
+
+```bash
+printf "%s" "$GOOGLE_API_KEY" > /tmp/google_api_key.txt
+
+# Export this from your already-authenticated spogo setup.
+# The blob must include sp_dc (required). sp_t is strongly recommended for connect playback reliability.
+# Example source from a local spogo profile:
+cp /path/to/exported/spogo_auth_blob.json /tmp/spogo_auth_blob.json
+```
+
+Run Step 3 setup:
+
+```bash
+bash scripts/configure_cloud_run_secrets_and_iam.sh \
+   <cloud_run_service_name> \
+   "$GOOGLE_CLOUD_PROJECT" \
+   "$GOOGLE_CLOUD_LOCATION" \
+   /tmp/google_api_key.txt \
+   /tmp/spogo_auth_blob.json
+```
+
+If the Cloud Run service does not exist yet, the script still creates/updates secrets and IAM bindings, then prints the exact `gcloud run services update --update-secrets ...` command to run after deploy.
+
+Optional arguments:
+
+- `google_api_key_secret_name` (default: `spogo-google-api-key`)
+- `spogo_auth_secret_name` (default: `spogo-spotify-auth`)
+- `service_account_email` override (otherwise auto-resolved from Cloud Run service)
+
+Verification checks:
+
+```bash
+gcloud run services describe <cloud_run_service_name> \
+   --project="$GOOGLE_CLOUD_PROJECT" \
+   --region="$GOOGLE_CLOUD_LOCATION" \
+   --format='flattened(spec.template.spec.containers[0].env)' \
+   | grep -E 'GOOGLE_API_KEY|GEMINI_API_KEY|SPOGO_AUTH_BLOB'
+```
+
+```bash
+gcloud run services describe <cloud_run_service_name> \
+   --project="$GOOGLE_CLOUD_PROJECT" \
+   --region="$GOOGLE_CLOUD_LOCATION" \
+   --format='value(spec.template.spec.serviceAccountName)'
+```
+
+This aligns with the ADK Live API guidance that production workloads on Vertex use Google Cloud credentials while sensitive app/runtime values are injected securely at deployment time.
+
+## Cloud Run Step 4 Spogo Runtime Bootstrap (CLI + Startup Auth)
+
+Step 4 ensures the Cloud Run runtime can run Spotify tools without assuming a preinstalled spogo binary in the base container.
+
+What this step enables in runtime:
+
+- Auto-install `spogo` when it is missing in `PATH`.
+- Parse `SPOGO_AUTH_BLOB` and write a runtime `spogo` config + cookie store.
+- Verify auth on startup before playback tools run.
+
+Apply Step 4 runtime env config:
+
+```bash
+bash scripts/configure_cloud_run_spogo_runtime.sh \
+   <cloud_run_service_name> \
+   "$GOOGLE_CLOUD_PROJECT" \
+   "$GOOGLE_CLOUD_LOCATION"
+```
+
+Optional args:
+
+- `spogo_version` (default: `0.2.0`)
+- `runtime_dir` (default: `/tmp/spogo-runtime`)
+- `require_device_cookie` (`TRUE` or `FALSE`, default: `FALSE`)
+
+Verification checks:
+
+```bash
+gcloud run services describe <cloud_run_service_name> \
+   --project="$GOOGLE_CLOUD_PROJECT" \
+   --region="$GOOGLE_CLOUD_LOCATION" \
+   --format='flattened(spec.template.spec.containers[0].env)' \
+   | grep -E 'SPOGO_AUTO_INSTALL|SPOGO_VERSION|SPOGO_RUNTIME_DIR|SPOGO_REQUIRE_AUTH_BLOB|SPOGO_VERIFY_AUTH_ON_STARTUP|SPOGO_REQUIRE_DEVICE_COOKIE|SPOGO_ENGINE|SPOGO_PROFILE'
+```
+
+```bash
+gcloud run services logs read <cloud_run_service_name> \
+   --project="$GOOGLE_CLOUD_PROJECT" \
+   --region="$GOOGLE_CLOUD_LOCATION" \
+   --limit=200 \
+   | grep -Ei 'spogo|bootstrap|auth|cookie'
+```
+
+Accepted `SPOGO_AUTH_BLOB` formats for startup bootstrap:
+
+- JSON object with `cookies` array (`{"cookies": [{"name": "sp_dc", ...}]}`)
+- JSON cookie array (`[{"name": "sp_dc", ...}]`)
+- Key/value text (`sp_dc=...`, `sp_key=...`, `sp_t=...`)
+
+If Step 4 cannot reliably initialize spogo in runtime, proceed to plan Step 6 and switch to a custom Cloud Run container install path.
 
 ## Interaction Flows (Current Behavior)
 
@@ -212,4 +378,4 @@ Expected result:
 
 - If there is no active Spotify device, the agent asks the user to open Spotify and play any song to activate a device.
 - While quiz mode is active, guesses are routed to quiz submission flow, not regular current-song guessing.
-- If you want microphone voice requests in ADK Web, set `AGENT_MODEL` to a Live API-capable model in `.env`.
+- If you want microphone voice requests in ADK Web, set `AGENT_MODEL` to a Live API-capable model in `.env` (`gemini-2.5-flash-native-audio-preview-12-2025` for local Gemini API, `gemini-live-2.5-flash-native-audio` for Vertex).

@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import base64
 from copy import deepcopy
 from difflib import SequenceMatcher
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
+import tarfile
+import tempfile
 from typing import Any, TypedDict
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 from google.adk.agents import Agent
 from google.adk.tools import ToolContext
@@ -19,7 +25,13 @@ try:
 except ImportError:
     genai = None
 
-_SPOGO_BIN = shutil.which("spogo") or "spogo"
+_SPOGO_BIN = (os.getenv("SPOGO_BIN") or "").strip() or shutil.which("spogo") or "spogo"
+_SPOGO_BOOTSTRAPPED = False
+_SPOGO_BOOTSTRAP_ERROR = ""
+_SPOGO_DEFAULT_VERSION = "0.2.0"
+_SPOGO_DEFAULT_RELEASE_BASE_URL = "https://github.com/steipete/spogo/releases/download"
+_SPOGO_DOWNLOAD_TIMEOUT_SECONDS = 30
+_SPOGO_AUTH_COOKIE_NAMES = ("sp_dc", "sp_key", "sp_t")
 _CONNECT_ENGINE = "--engine=connect"
 _DEFAULT_SONG_LIST_COUNT = 5
 _MAX_SONG_LIST_COUNT = 20
@@ -28,6 +40,444 @@ _SONG_QUIZ_STATE_KEY = "song_quiz_state"
 _SONG_QUIZ_STATE_SCHEMA_VERSION = 1
 _SONG_QUIZ_ROUND_COUNT = 5
 _SONG_QUIZ_MAX_ATTEMPTS = 2
+
+
+def _is_truthy_env(value: str | None) -> bool:
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _runtime_spogo_dir() -> str:
+    configured_dir = (os.getenv("SPOGO_RUNTIME_DIR") or "").strip()
+    return configured_dir or "/tmp/spogo-runtime"
+
+
+def _detect_spogo_platform() -> tuple[str | None, str | None]:
+    system_name = platform.system().lower().strip()
+    machine_name = platform.machine().lower().strip()
+
+    if system_name not in {"linux", "darwin"}:
+        return None, None
+
+    if machine_name in {"x86_64", "amd64"}:
+        normalized_arch = "amd64"
+    elif machine_name in {"arm64", "aarch64"}:
+        normalized_arch = "arm64"
+    else:
+        return None, None
+
+    return system_name, normalized_arch
+
+
+def _download_spogo_binary(version: str, destination_dir: str) -> tuple[str | None, str]:
+    os_name, arch = _detect_spogo_platform()
+    if not os_name or not arch:
+        return None, (
+            "Automatic spogo install is unsupported on this platform. "
+            "Set SPOGO_BIN to a valid executable path."
+        )
+
+    normalized_version = version.strip().lstrip("v") or _SPOGO_DEFAULT_VERSION
+    download_url = (os.getenv("SPOGO_DOWNLOAD_URL") or "").strip()
+    if not download_url:
+        release_base = (
+            os.getenv("SPOGO_RELEASE_BASE_URL") or _SPOGO_DEFAULT_RELEASE_BASE_URL
+        ).strip().rstrip("/")
+        archive_name = f"spogo_{normalized_version}_{os_name}_{arch}.tar.gz"
+        download_url = f"{release_base}/v{normalized_version}/{archive_name}"
+
+    os.makedirs(destination_dir, exist_ok=True)
+    final_binary_path = os.path.join(destination_dir, "spogo")
+    if os.path.isfile(final_binary_path) and os.access(final_binary_path, os.X_OK):
+        return final_binary_path, ""
+
+    with tempfile.TemporaryDirectory(prefix="spogo-install-") as temp_dir:
+        archive_path = os.path.join(temp_dir, "spogo.tar.gz")
+        staged_binary_path = os.path.join(temp_dir, "spogo")
+
+        try:
+            with urlrequest.urlopen(
+                download_url,
+                timeout=_SPOGO_DOWNLOAD_TIMEOUT_SECONDS,
+            ) as response:
+                with open(archive_path, "wb") as archive_file:
+                    shutil.copyfileobj(response, archive_file)
+        except (urlerror.URLError, TimeoutError, OSError) as error:
+            return None, f"Failed to download spogo from '{download_url}': {error}"
+
+        try:
+            with tarfile.open(archive_path, mode="r:gz") as archive:
+                binary_member = next(
+                    (
+                        member
+                        for member in archive.getmembers()
+                        if member.isfile() and os.path.basename(member.name) == "spogo"
+                    ),
+                    None,
+                )
+                if binary_member is None:
+                    return None, "Downloaded spogo archive is missing the spogo binary."
+
+                extracted_file = archive.extractfile(binary_member)
+                if extracted_file is None:
+                    return None, "Downloaded spogo archive could not be extracted."
+
+                try:
+                    with open(staged_binary_path, "wb") as staged_binary_file:
+                        shutil.copyfileobj(extracted_file, staged_binary_file)
+                finally:
+                    extracted_file.close()
+        except tarfile.TarError as error:
+            return None, f"Failed to unpack spogo archive: {error}"
+
+        os.chmod(staged_binary_path, 0o755)
+        shutil.move(staged_binary_path, final_binary_path)
+
+    return final_binary_path, ""
+
+
+def _resolve_spogo_binary() -> tuple[str | None, str]:
+    configured_binary = (os.getenv("SPOGO_BIN") or "").strip()
+    if configured_binary:
+        if os.path.isfile(configured_binary) and os.access(configured_binary, os.X_OK):
+            return configured_binary, ""
+
+        configured_lookup = shutil.which(configured_binary)
+        if configured_lookup:
+            return configured_lookup, ""
+
+        return None, f"Configured SPOGO_BIN was not found: '{configured_binary}'."
+
+    discovered_binary = shutil.which("spogo")
+    if discovered_binary:
+        return discovered_binary, ""
+
+    if not _is_truthy_env(os.getenv("SPOGO_AUTO_INSTALL")):
+        return None, (
+            "spogo CLI not found in PATH. "
+            "Enable SPOGO_AUTO_INSTALL=TRUE or set SPOGO_BIN."
+        )
+
+    version = (os.getenv("SPOGO_VERSION") or _SPOGO_DEFAULT_VERSION).strip()
+    install_dir = os.path.join(_runtime_spogo_dir(), "bin")
+    return _download_spogo_binary(version, install_dir)
+
+
+def _strip_wrapped_quotes(value: str) -> str:
+    stripped = (value or "").strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {'"', "'"}:
+        return stripped[1:-1].strip()
+    return stripped
+
+
+def _normalize_cookie_entry(
+    raw_cookie: dict[str, Any],
+    allowed_cookie_names: tuple[str, ...] | None = None,
+) -> dict[str, Any] | None:
+    cookie_name = str(raw_cookie.get("name") or "").strip().lower()
+    cookie_value = _strip_wrapped_quotes(str(raw_cookie.get("value") or ""))
+    if not cookie_name or not cookie_value:
+        return None
+
+    if allowed_cookie_names is not None and cookie_name not in allowed_cookie_names:
+        return None
+
+    domain = str(raw_cookie.get("domain") or ".spotify.com").strip() or ".spotify.com"
+    if not domain.startswith("."):
+        domain = f".{domain}"
+
+    cookie_path = str(raw_cookie.get("path") or "/").strip() or "/"
+    secure = bool(raw_cookie.get("secure", True))
+    http_only = bool(raw_cookie.get("http_only", raw_cookie.get("httpOnly", True)))
+
+    return {
+        "name": cookie_name,
+        "value": cookie_value,
+        "domain": domain,
+        "path": cookie_path,
+        "secure": secure,
+        "http_only": http_only,
+    }
+
+
+def _extract_cookie_kv_pairs(raw_text: str) -> dict[str, str]:
+    extracted_values: dict[str, str] = {}
+    for cookie_name in _SPOGO_AUTH_COOKIE_NAMES:
+        match = re.search(
+            rf"(?:^|[\s;]){cookie_name}\s*=\s*([^;\s]+)",
+            raw_text,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            continue
+        cookie_value = _strip_wrapped_quotes(match.group(1))
+        if cookie_value:
+            extracted_values[cookie_name] = cookie_value
+    return extracted_values
+
+
+def _to_cookie_store_entries(raw_blob: str) -> tuple[list[dict[str, Any]], str]:
+    raw_text = (raw_blob or "").strip()
+    if not raw_text:
+        return [], "SPOGO auth blob is empty."
+
+    parsed_payload: Any
+    parsed_ok = False
+    try:
+        parsed_payload = json.loads(raw_text)
+        parsed_ok = True
+    except json.JSONDecodeError:
+        parsed_payload = None
+
+    cookies: list[dict[str, Any]] = []
+
+    if parsed_ok:
+        if isinstance(parsed_payload, list):
+            for item in parsed_payload:
+                if isinstance(item, dict):
+                    normalized_cookie = _normalize_cookie_entry(item)
+                    if normalized_cookie:
+                        cookies.append(normalized_cookie)
+
+        elif isinstance(parsed_payload, dict):
+            maybe_cookie_list = parsed_payload.get("cookies")
+            if isinstance(maybe_cookie_list, list):
+                for item in maybe_cookie_list:
+                    if isinstance(item, dict):
+                        normalized_cookie = _normalize_cookie_entry(item)
+                        if normalized_cookie:
+                            cookies.append(normalized_cookie)
+            else:
+                direct_pairs: dict[str, str] = {}
+                for cookie_name in _SPOGO_AUTH_COOKIE_NAMES:
+                    raw_value = parsed_payload.get(cookie_name)
+                    if raw_value is None:
+                        raw_value = parsed_payload.get(cookie_name.upper())
+                    if raw_value is None:
+                        continue
+                    cleaned_value = _strip_wrapped_quotes(str(raw_value))
+                    if cleaned_value:
+                        direct_pairs[cookie_name] = cleaned_value
+
+                for cookie_name in _SPOGO_AUTH_COOKIE_NAMES:
+                    cookie_value = direct_pairs.get(cookie_name)
+                    if not cookie_value:
+                        continue
+                    normalized_cookie = _normalize_cookie_entry(
+                        {
+                            "name": cookie_name,
+                            "value": cookie_value,
+                            "domain": parsed_payload.get("domain", ".spotify.com"),
+                        }
+                    )
+                    if normalized_cookie:
+                        cookies.append(normalized_cookie)
+
+    if not cookies:
+        text_pairs = _extract_cookie_kv_pairs(raw_text)
+        for cookie_name in _SPOGO_AUTH_COOKIE_NAMES:
+            cookie_value = text_pairs.get(cookie_name)
+            if not cookie_value:
+                continue
+            normalized_cookie = _normalize_cookie_entry(
+                {
+                    "name": cookie_name,
+                    "value": cookie_value,
+                    "domain": ".spotify.com",
+                }
+            )
+            if normalized_cookie:
+                cookies.append(normalized_cookie)
+
+    deduped_by_identity: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for cookie in cookies:
+        identity = (
+            cookie["name"],
+            cookie["domain"],
+            cookie["path"],
+            cookie["value"],
+        )
+        deduped_by_identity[identity] = cookie
+
+    normalized_cookies = list(deduped_by_identity.values())
+    if not any(cookie["name"] == "sp_dc" for cookie in normalized_cookies):
+        return [], "SPOGO auth blob must include sp_dc cookie value."
+
+    return normalized_cookies, ""
+
+
+def _read_spogo_auth_blob() -> tuple[str, str]:
+    direct_base64_blob = (os.getenv("SPOGO_AUTH_BLOB_BASE64") or "").strip()
+    if direct_base64_blob:
+        try:
+            decoded_bytes = base64.b64decode(direct_base64_blob, validate=True)
+            decoded_text = decoded_bytes.decode("utf-8").strip()
+            if not decoded_text:
+                return "", "SPOGO_AUTH_BLOB_BASE64 decoded to empty text."
+            return decoded_text, ""
+        except (ValueError, UnicodeDecodeError) as error:
+            return "", f"Invalid SPOGO_AUTH_BLOB_BASE64 value: {error}"
+
+    raw_blob = (os.getenv("SPOGO_AUTH_BLOB") or "").strip()
+    if not raw_blob:
+        return "", ""
+
+    if raw_blob.lower().startswith("base64:"):
+        try:
+            decoded_bytes = base64.b64decode(raw_blob[7:].strip(), validate=True)
+            decoded_text = decoded_bytes.decode("utf-8").strip()
+            if not decoded_text:
+                return "", "SPOGO_AUTH_BLOB base64 payload decoded to empty text."
+            return decoded_text, ""
+        except (ValueError, UnicodeDecodeError) as error:
+            return "", f"Invalid base64 payload in SPOGO_AUTH_BLOB: {error}"
+
+    if _is_truthy_env(os.getenv("SPOGO_AUTH_BLOB_IS_BASE64")):
+        try:
+            decoded_bytes = base64.b64decode(raw_blob, validate=True)
+            decoded_text = decoded_bytes.decode("utf-8").strip()
+            if not decoded_text:
+                return "", "SPOGO_AUTH_BLOB decoded to empty text."
+            return decoded_text, ""
+        except (ValueError, UnicodeDecodeError) as error:
+            return "", f"Invalid base64 SPOGO_AUTH_BLOB: {error}"
+
+    return raw_blob, ""
+
+
+def _write_spogo_runtime_auth_files(cookies: list[dict[str, Any]]) -> tuple[str, str, str]:
+    runtime_dir = _runtime_spogo_dir()
+    config_dir = os.path.join(runtime_dir, "config")
+    cookies_dir = os.path.join(config_dir, "cookies")
+
+    os.makedirs(cookies_dir, exist_ok=True)
+
+    profile_name = (os.getenv("SPOGO_PROFILE") or "default").strip() or "default"
+    engine_name = (os.getenv("SPOGO_ENGINE") or "connect").strip() or "connect"
+
+    cookie_path = os.path.join(cookies_dir, f"{profile_name}.json")
+    config_path = os.path.join(config_dir, "config.toml")
+
+    try:
+        with open(cookie_path, "w", encoding="utf-8") as cookie_file:
+            json.dump(cookies, cookie_file, ensure_ascii=True, indent=2)
+    except OSError as error:
+        return "", "", f"Failed to write spogo cookie store: {error}"
+
+    config_content = (
+        f'default_profile = "{profile_name}"\n'
+        f"[profile.{profile_name}]\n"
+        f'cookie_path = "{cookie_path}"\n'
+        f'browser = "chrome"\n'
+        f'engine = "{engine_name}"\n'
+    )
+
+    try:
+        with open(config_path, "w", encoding="utf-8") as config_file:
+            config_file.write(config_content)
+    except OSError as error:
+        return "", "", f"Failed to write spogo config.toml: {error}"
+
+    os.environ["SPOGO_CONFIG"] = config_path
+    os.environ["SPOGO_PROFILE"] = profile_name
+    return config_path, cookie_path, ""
+
+
+def _validate_spogo_auth_status(spogo_binary: str) -> tuple[bool, str]:
+    try:
+        auth_status = subprocess.run(
+            [spogo_binary, "auth", "status", "--json"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except FileNotFoundError:
+        return False, "spogo CLI was not found while checking auth status."
+    except subprocess.TimeoutExpired:
+        return False, "spogo auth status timed out after 10s."
+
+    stdout = (auth_status.stdout or "").strip()
+    stderr = (auth_status.stderr or "").strip()
+    if auth_status.returncode != 0:
+        status_error = stderr or stdout or "spogo auth status failed"
+        return False, f"spogo auth status failed: {status_error}"
+
+    if not stdout:
+        return True, ""
+
+    try:
+        status_payload = json.loads(stdout)
+    except json.JSONDecodeError:
+        return True, ""
+
+    if not isinstance(status_payload, dict):
+        return True, ""
+
+    if status_payload.get("has_sp_dc") is False:
+        return False, "spogo auth status reported missing sp_dc cookie."
+
+    if _is_truthy_env(os.getenv("SPOGO_REQUIRE_DEVICE_COOKIE")):
+        has_device_cookie = status_payload.get("has_sp_t")
+        if has_device_cookie is False:
+            return False, "spogo auth status reported missing sp_t cookie."
+
+    return True, ""
+
+
+def _bootstrap_spogo_runtime_if_needed() -> tuple[bool, str]:
+    global _SPOGO_BIN
+    global _SPOGO_BOOTSTRAPPED
+    global _SPOGO_BOOTSTRAP_ERROR
+
+    if _SPOGO_BOOTSTRAPPED:
+        return _SPOGO_BOOTSTRAP_ERROR == "", _SPOGO_BOOTSTRAP_ERROR
+
+    _SPOGO_BOOTSTRAPPED = True
+
+    resolved_binary, binary_error = _resolve_spogo_binary()
+    if not resolved_binary:
+        _SPOGO_BOOTSTRAP_ERROR = binary_error or "spogo CLI is unavailable."
+        return False, _SPOGO_BOOTSTRAP_ERROR
+
+    _SPOGO_BIN = resolved_binary
+
+    auth_blob, auth_blob_error = _read_spogo_auth_blob()
+    if auth_blob_error:
+        _SPOGO_BOOTSTRAP_ERROR = auth_blob_error
+        return False, _SPOGO_BOOTSTRAP_ERROR
+
+    require_auth_blob = _is_truthy_env(os.getenv("SPOGO_REQUIRE_AUTH_BLOB"))
+    if require_auth_blob and not auth_blob:
+        _SPOGO_BOOTSTRAP_ERROR = (
+            "SPOGO_REQUIRE_AUTH_BLOB is enabled but SPOGO_AUTH_BLOB is missing."
+        )
+        return False, _SPOGO_BOOTSTRAP_ERROR
+
+    if auth_blob:
+        cookie_entries, cookie_error = _to_cookie_store_entries(auth_blob)
+        if cookie_error:
+            _SPOGO_BOOTSTRAP_ERROR = cookie_error
+            return False, _SPOGO_BOOTSTRAP_ERROR
+
+        _, _, write_error = _write_spogo_runtime_auth_files(cookie_entries)
+        if write_error:
+            _SPOGO_BOOTSTRAP_ERROR = write_error
+            return False, _SPOGO_BOOTSTRAP_ERROR
+
+    should_verify_auth = (
+        _is_truthy_env(os.getenv("SPOGO_VERIFY_AUTH_ON_STARTUP"))
+        or bool(auth_blob)
+        or require_auth_blob
+    )
+
+    if should_verify_auth:
+        is_authenticated, auth_error = _validate_spogo_auth_status(_SPOGO_BIN)
+        if not is_authenticated:
+            _SPOGO_BOOTSTRAP_ERROR = auth_error
+            return False, _SPOGO_BOOTSTRAP_ERROR
+
+    _SPOGO_BOOTSTRAP_ERROR = ""
+    return True, ""
 
 
 class SongQuizRoundState(TypedDict):
@@ -250,6 +700,13 @@ def _clear_song_quiz_state(tool_context: ToolContext | None) -> SongQuizState:
 
 def _run_spogo(args: list[str], timeout_seconds: int = 20) -> dict[str, Any]:
     """Run a spogo command and return normalized output."""
+    runtime_ready, runtime_error = _bootstrap_spogo_runtime_if_needed()
+    if not runtime_ready:
+        return {
+            "ok": False,
+            "error": f"spogo runtime bootstrap failed: {runtime_error}",
+        }
+
     command = [_SPOGO_BIN, *args]
 
     try:
@@ -263,7 +720,7 @@ def _run_spogo(args: list[str], timeout_seconds: int = 20) -> dict[str, Any]:
     except FileNotFoundError:
         return {
             "ok": False,
-            "error": "spogo CLI not found in PATH.",
+            "error": "spogo CLI not found in PATH after bootstrap.",
         }
     except subprocess.TimeoutExpired:
         return {
