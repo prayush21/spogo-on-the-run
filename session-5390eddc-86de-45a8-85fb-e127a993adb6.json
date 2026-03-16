@@ -1,0 +1,440 @@
+{
+  "id": "5390eddc-86de-45a8-85fb-e127a993adb6",
+  "appName": "spogo_song_agent",
+  "userId": "user",
+  "state": {},
+  "events": [
+    {
+      "partial": false,
+      "inputTranscription": {
+        "text": "Hello.",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "090ea915-cc13-4ffe-840e-89518e136799",
+      "timestamp": 1773628769.6640282
+    },
+    {
+      "partial": false,
+      "outputTranscription": {
+        "text": "Hello, how can I help you?",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "2cd301af-b268-4754-918b-7dec37559bbd",
+      "timestamp": 1773628770.4891624
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "usageMetadata": {
+        "promptTokenCount": 431,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 393
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 38
+          }
+        ],
+        "totalTokenCount": 490
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "36139e32-6f1f-4cbe-84be-fd2bad43b916",
+      "timestamp": 1773628770.4914298
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "groundingMetadata": {},
+      "turnComplete": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "a39ae902-d107-40e0-946a-e849180fea47",
+      "timestamp": 1773628770.491723
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "interrupted": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "56ad7ef7-58ae-4a96-ad6b-c9c2de81415f",
+      "timestamp": 1773628771.66101
+    },
+    {
+      "partial": false,
+      "inputTranscription": {
+        "text": "{} No.",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "bd9cc918-f990-46ab-89ac-e3bc8efc3736",
+      "timestamp": 1773628774.0777166
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "interrupted": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "9f550438-303a-419f-8505-1ff44d662646",
+      "timestamp": 1773628774.7346272
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "usageMetadata": {
+        "promptTokenCount": 578,
+        "promptTokensDetails": [
+          {
+            "modality": "AUDIO",
+            "tokenCount": 175
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 403
+          }
+        ],
+        "totalTokenCount": 612
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "1a56b8f8-a40c-4b8e-8ec0-95059bcd6df7",
+      "timestamp": 1773628774.735739
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "groundingMetadata": {},
+      "turnComplete": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "7b1075b7-9d44-4cf1-828e-97130ea29d18",
+      "timestamp": 1773628774.736109
+    },
+    {
+      "partial": false,
+      "inputTranscription": {
+        "text": "Can I do a song quiz?",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "44c13e75-21ab-4766-a955-3fba9cbcd6bc",
+      "timestamp": 1773628776.3619502
+    },
+    {
+      "partial": false,
+      "outputTranscription": {
+        "text": "Sorry, IYes! What category would you like to do the quiz on?",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "0f27aeca-bf97-4d53-80a2-dac04b64bdf4",
+      "timestamp": 1773628777.452138
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "usageMetadata": {
+        "promptTokenCount": 674,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 413
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 261
+          }
+        ],
+        "totalTokenCount": 773
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "05780ddc-0ee7-4084-bdfe-83eeb331cdef",
+      "timestamp": 1773628777.4541461
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "groundingMetadata": {},
+      "turnComplete": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "3586ed8a-11c7-4b87-b7df-31317be7a135",
+      "timestamp": 1773628777.4544613
+    },
+    {
+      "partial": false,
+      "inputTranscription": {
+        "text": "I would like to do a quiz on all the Salman Khan songs.",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "7eb45385-00e4-4f66-b3be-25d288f84175",
+      "timestamp": 1773628785.8310006
+    },
+    {
+      "partial": false,
+      "outputTranscription": {
+        "text": "Great choice! I'm selecting five songs by Salman Khan and getting the quiz ready.",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "1999bd98-30bb-4f0a-82c1-87070caf70e1",
+      "timestamp": 1773628788.590685
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "content": {
+        "parts": [
+          {
+            "functionCall": {
+              "id": "259d5159-4ff5-4d94-8f15-0bd00d332c42",
+              "args": {
+                "count": 5,
+                "user_request": "Salman Khan songs"
+              },
+              "name": "start_song_quiz"
+            }
+          }
+        ],
+        "role": "model"
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "longRunningToolIds": [],
+      "id": "2328f1c4-554a-4cc8-a61f-1f0875a522ce",
+      "timestamp": 1773628787.4997537
+    },
+    {
+      "content": {
+        "parts": [
+          {
+            "functionResponse": {
+              "id": "259d5159-4ff5-4d94-8f15-0bd00d332c42",
+              "name": "start_song_quiz",
+              "response": {
+                "status": "error",
+                "error_message": "Song list generation failed.",
+                "details": "401 UNAUTHENTICATED. {'error': {'code': 401, 'message': 'API keys are not supported by this API. Expected OAuth2 access token or other authentication credentials that assert a principal. See https://cloud.google.com/docs/authentication', 'status': 'UNAUTHENTICATED', 'details': [{'@type': 'type.googleapis.com/google.rpc.ErrorInfo', 'reason': 'CREDENTIALS_MISSING', 'domain': 'googleapis.com', 'metadata': {'method': 'google.cloud.aiplatform.v1beta1.PredictionService.GenerateContent', 'service': 'aiplatform.googleapis.com'}}]}}"
+              }
+            }
+          }
+        ],
+        "role": "user"
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "40024d75-12ce-438a-a174-48576b8e55c2",
+      "timestamp": 1773628788.5849528
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "usageMetadata": {
+        "promptTokenCount": 945,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 441
+          },
+          {
+            "modality": "AUDIO",
+            "tokenCount": 504
+          }
+        ],
+        "totalTokenCount": 1113
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "aaf9b829-9ae5-4431-af90-97d2f0f75644",
+      "timestamp": 1773628788.5920627
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "groundingMetadata": {},
+      "turnComplete": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "fa9deef4-e5e7-4af4-9a87-9383a47a7bfe",
+      "timestamp": 1773628788.5923786
+    },
+    {
+      "partial": false,
+      "outputTranscription": {
+        "text": "Sorry, I encountered an issue trying to start the quiz. Please try again.",
+        "finished": true
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "eaf3a33a-d987-4faa-98c3-9668e20842c8",
+      "timestamp": 1773628790.2019284
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "usageMetadata": {
+        "promptTokenCount": 1258,
+        "promptTokensDetails": [
+          {
+            "modality": "AUDIO",
+            "tokenCount": 627
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 631
+          }
+        ],
+        "totalTokenCount": 1388
+      },
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "8937fd64-9926-4789-8a8b-b5d8378c8a67",
+      "timestamp": 1773628790.20443
+    },
+    {
+      "modelVersion": "gemini-live-2.5-flash-native-audio",
+      "groundingMetadata": {},
+      "turnComplete": true,
+      "invocationId": "e-62b9af6f-eb91-4d46-921b-8bbfbb68335a",
+      "author": "spogo_song_agent",
+      "actions": {
+        "stateDelta": {},
+        "artifactDelta": {},
+        "requestedAuthConfigs": {},
+        "requestedToolConfirmations": {}
+      },
+      "id": "99b21d63-8c2f-4fbe-80fe-a7e66f41b606",
+      "timestamp": 1773628790.2047508
+    }
+  ],
+  "lastUpdateTime": 1773628790.2047508
+}
